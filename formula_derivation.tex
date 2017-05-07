@@ -1,0 +1,95 @@
+\documentclass[11pt]{article}
+\usepackage[parfill]{parskip}
+\usepackage[top=1in, bottom=1in, left=1 in, right=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{amssymb}
+\usepackage{caption}
+\usepackage{bm}
+\usepackage{mathbbol}
+\usepackage{subcaption}
+\usepackage[fleqn]{amsmath}
+\graphicspath{ {images/} }
+\DeclareMathSizes{15}{15}{15}{15}
+\usepackage{setspace} 
+\usepackage{tikz,pgfplots,pgfplotstable,filecontents}
+\usetikzlibrary{arrows,decorations.pathmorphing,fit,positioning}
+\setlength{\parindent}{0.6em}
+\setlength{\parskip}{0.6em}
+\date{\vspace{-5ex}}
+\begin{document}
+\newcommand\ddfrac[2]{\frac{\displaystyle #1}{\displaystyle #2}}
+\begin{spacing}{1.6}
+\title{Gibbs sampling for HDP-LDA}
+\maketitle
+
+\section{Chinese Restaurant Franchise}
+\noindent 
+\subsection{Definitions}
+\begin{equation}
+G_0 \sim DP(\gamma,H)\\
+G_j \sim DP(\alpha_0,G_0) \\
+\theta_{ji} \sim G_j \\
+x_{ji} \sim F(\theta_{ji}) 
+\end{equation}
+
+$j=1,\ldots,J$ restaurants
+
+$\theta_{ji}$ is a customer in restaurant j
+
+$x_{ji}$ are observed words
+
+$t_{ji}$ is the table sat on by customer i in restaurant j
+
+$k_{jt}$ is the dish index of table t in restaurant j
+
+$n_{jtk}$ is the number of customers in restaurant j at table t served with dish k
+
+$m_{jk}$ is the number of tables in restaurant j served with dish k
+
+\subsection{HDP-LDA}
+H is the topic distribution over the vacabulary $H \sim Dirichlet(\beta)$ \\
+$\phi_1,\ldots,\phi_K$ are distinct dishes that restaurants serve $\phi_k \sim H$ \\
+F is the multinomial distribution over the vocabulary $x_{ji} \sim Mult(\theta_{ji})$\\
+We have:
+\begin{equation} \label{eq1}
+h(\phi_k)=\frac{\prod_v [\phi_k]^{\beta-1}_v }{C}
+\end{equation} C is a constant.\\
+
+\noindent The derivation of the conditional distribution of word $x_{ji} $ with topic k given all other observations $f^{-ji}_k(x_{ji})$ (eq.30 on [Teh+2006]) is as follows: Let $n^{-ji}_{kv}$ be number of words v served with dish k excluding the current observation. and $n^{-ji}_{k.}$ is the number of words served with dish k excluding the current observation.\\
+
+\noindent When a new customer arrives at the restaurant j, if he sits on an existing table:
+\begin{equation}
+f^{-ji}_k(x_{ji})=\frac{\beta+n^{-ji}_{kv}}{V\beta+n^{-ji}_{k.}}
+\end{equation}\\
+If he takes a new table:
+\begin{equation}
+f^{-ji}_{k^{new}}(x_{ji})=\frac{1}{V}
+\end{equation}\\
+
+\subsection{Posterior Sampling}
+\noindent The likelihood due to $x_{ji}$ given $t_{ji}=t$ for some previously used t is $f^{-ji}_k(x_{ji})$, The likelihood for $t_{ji}=t^{new}$ can be calculated by integrating out the possible values for $k_{jt^{new}}$:
+\begin{equation}
+p(x_{ji}| {\bf{t}}^{-ji},t_{ji}=t^{new},{\bf{k}})=\sum^{K}_{k=1}( \frac{m_{.k}}{m_{..}+\gamma} \cdot \frac{\beta+n^{-ji}_{kv}}{V\beta+n^{-ji}_{k.}}) + \frac{\gamma}{m_{..}+\gamma} \cdot \frac{1}{V}
+\end{equation}
+The conditional distribution of the table index $t_{ji}$ given the remainder of the variables:
+\begin{equation}
+    P(t_{ji} | \bf{t}^{-ji}, \bf{k}) \propto
+    \begin{cases}
+      n^{-ji}_{jt.} \cdot \frac{\beta+n^{-ji}_{kv}}{V\beta+n^{-ji}_{k.}}, & \text{if t is previously used} \\
+      \alpha_0 \cdot p(x_{ji}| {\bf{t}}^{-ji},t_{ji}=t^{new},{\bf{k}}) , & \text{if}\ t=t^{new}
+    \end{cases}
+\end{equation}\\
+
+\noindent If the sampled value of $t_{ji}$ is $t^{new}$, we obtain a sample of $k_{jt^{new}}$ by sampling from the conditional distribution:
+\begin{equation}
+p(k_{jt^{new}}=k|{\bf{t}},{\bf{k}}^{-jt^{new}}) \propto
+    \begin{cases}
+      m_{.k} \cdot \frac{\beta+n^{-ji}_{kv}}{V\beta+n^{-ji}_{k.}}, & \text{if k is previously used} \\
+      \frac{\gamma}{V}, &\text{if}\ k=k^{new}
+    \end{cases}
+\end{equation}
+
+
+\end{spacing}
+\end{document}
