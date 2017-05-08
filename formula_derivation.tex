@@ -58,7 +58,7 @@ h(\phi_k)=\frac{\prod_v [\phi_k]^{\beta-1}_v }{C}
 
 \noindent The derivation of the conditional distribution of word $x_{ji} $ with topic k given all other observations $f^{-ji}_k(x_{ji})$ (eq.30 on [Teh+2006]) is as follows: Let $n^{-ji}_{kv}$ be number of words v served with dish k excluding the current observation. and $n^{-ji}_{k.}$ is the number of words served with dish k excluding the current observation.\\
 
-\noindent When a new customer arrives at the restaurant j, if he sits on an existing table:
+\noindent When a new customer arrives at the restaurant j, if he sits on an existing table: 
 \begin{equation}
 f^{-ji}_k(x_{ji})=\frac{\beta+n^{-ji}_{kv}}{V\beta+n^{-ji}_{k.}}
 \end{equation}\\
@@ -90,6 +90,23 @@ p(k_{jt^{new}}=k|{\bf{t}},{\bf{k}}^{-jt^{new}}) \propto
     \end{cases}
 \end{equation}
 
+\noindent Let ${\bf{x}}_jt$ be all customers in restaurant j sit at table t, the likelihood obtained by setting $k_{jt}=k$ is given by $f^{{\bf{x}}_{jt}}_k({\bf{x}}_{jt})$, so the conditional distribution of $k_{jt}$ is:
+\begin{equation}
+p(k_{jt}=k | {\bf{t}},{\bf{k}}^{-jt}) \propto
+    \begin{cases}
+      m^{-jt}_{.k} f^{{\bf{x}}_{jt}}_k({\bf{x}}_{jt}), & \text{if k is previously used} \\
+      \gamma f^{{\bf{x}}_{jt}}_{k^{new}}({\bf{x}}_{jt}), &\text{if}\ k=k^{new}
+    \end{cases}
+\end{equation}\\
 
+\noindent Now we need to derive $f^{{\bf{x}}_{jt}}_k({\bf{x}}_{jt})$. (handwritten proof)
+\begin{equation}
+f^{{\bf{x}}_{jt}}_k({\bf{x}}_{jt})=\frac{\prod_w \Gamma(n^{-jt}_{kw}+n^{jt}_{.w}+\beta)}{\prod_w \Gamma(n^{-jt}_{kw}+\beta)} \cdot \frac{\Gamma(n^{-jt}_{k.}+V\beta)}{\Gamma(n^{-jt}_{k.}+n^{jt}_{..}+\beta)}
+\end{equation}\\
+
+\noindent Also the conditional distribution when $k=k^{new}$. (handwritten proof)
+\begin{equation} 
+f^{{\bf{x}}_{jt}}_{k^{new}}({\bf{x}}_{jt}) = \frac{\Gamma(V\beta)\prod_w \Gamma(\beta+n^{jt}_{.w})}{\Gamma(V\beta+n^{jt}_{..})\prod_w \Gamma(\beta)}
+\end{equation}
 \end{spacing}
 \end{document}

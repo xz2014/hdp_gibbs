@@ -11,8 +11,8 @@ def posterior_t(j,i,w,tables):
 
 	tt=np.random.multinomial(1, p_t).argmax()
 
-	if tt < len(tables):
+	if tt < len(tables):  # pick an existing table
 		return tables[tt]
 	else:
-		return new_table(j, i, f_k)
+		return new_table(j, i, f_k) # pick a new table
 
