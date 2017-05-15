@@ -1,7 +1,6 @@
 #! /usr/bin/env python
-# gibbs sampling in Gamma-gamma-poisson-process
 
-#### #######################################  Gibbs sampler
+#### #######################################  Gibbs sampler in HDP & Gamma-Poisson-Process
 import numpy as np
 
 
@@ -12,7 +11,7 @@ class hdp_GGPP:
 		self.beta = beta
 		self.V = V   
 		self.m = m
-		self.maxNIter = maxNIter #
+		self.maxNIter = maxNIter # number of iterations to update n_dk in each iteration
 		self.T = T
 		self.numIter = numIter # total number of iterations 
 		self.sizeofstack = sizeofstack  # size of each stack, needs to be large so the empirical distribution of S_d is same as X_dk
@@ -23,15 +22,27 @@ class hdp_GGPP:
 		self.D = len(corpus)
 		self.topics = range(T)
 
-		self.S_d = [np.random.choice(corpus[d],sizeofstack,replace=True) for d in range(D)] # stack for each document
-		self.B_dk = [[np.ndarray(0,dtype=int) for k in topics] for a in corpus]
-		self.X_dk = [[np.ndarray(0,dtype=int) for k in topics] for a in corpus] # each X_dk[d][k] is a list of words
-		self.n_dk =[np.ndarray(0, dtype=int) for a in corpus] # each n_dk[d][k] is the number of words in document d with topic k
+		self.S_d = [np.random.choice(corpus[d],sizeofstack,replace=True).tolist() for d in range(D)] # stack for each document
+		self.B_dk = [[[] for k in topics] for a in corpus] # buffer
+		self.X_dk = [[[] for k in topics] for a in corpus] # each X_dk[d][k] is a list of words
+		self.n_dk =[np.array([0]*T) for a in corpus] # each n_dk[d][k] is the number of words in document d with topic k
 
 #### initialize
+
+		self.initial_topics = [[0]*len(corpus[0])]*2
 		self.alpha_k = [[] for a in topics]  
 		self.theta_k = [np.zeros(V,dtype=int) for a in topics]
 		self.pi_dk = [[np.ndarray(0,dtype=int) for k in topics] for a in corpus]
+
+
+		for d in range(D):
+			for k in range(T):
+				z = [x for x in corpus[d] if initial_topics[d][k] == k ]
+				X_dk[d][k].extend(z)
+				n_dk[d][k] = len(z)
+
+
+		
 
 
 
@@ -51,7 +62,7 @@ class hdp_GGPP:
 		n_new=[]
 		for d in range(D):
 			for niter in range(maxNIter):
-				n_dk.append(sample_ndk(d,k,maxBufferSize))
+				n_dk.append(sample_ndk(self,d,k,maxBufferSize))
 
 		# update pi_dk for each d and k
 		pi_dk = np.random.gamma(n_new[d][k]+alpha_k[k], m+1)	
@@ -105,25 +116,38 @@ class hdp_GGPP:
 
 			if (uu < p_plus(x)): # accept with prob = min(1,p_plus)
 				n_dk[d][k] =+ 1
-				X_dk[d][k].append(x)
+				X_dk[d][k].extend(x)
 				nacceptAdd =+ 1
 			else:
 				B_dk[d][k].append(x)
 
 		else:
-			x=np.random.choice(X_dk[d][k],replace=False)
-			X_dk[d][k].remove(x)
-			
-			uu = np.random.uniform(0,1)
-			if (uu < p_minus(x)):   # accept with prob = min(1,p_minus)
-				n_dk[d][k] =- 1
-				nacceptMinus =+ 1
-				B_dk[d][k].append(x)
+			if (len(X_dk[d][k]) > 0):
+				x=np.random.choice(X_dk[d][k],replace=False)
+				X_dk[d][k].remove(x)
+				uu = np.random.uniform(0,1)
+				if (uu < p_minus(x)):  
+					n_dk[d][k] =- 1
+					nacceptMinus =+ 1
+					B_dk[d][k].append(x)
+				else:
+					X_dk[d][k].extend(x)
 			else:
-				X_dk[d][k].append(x)
+				x=np.random.choice(S_d[d],replace=False)
+				S_d[d].remove(x)
+
+				uu = np.random.uniform(0,1)
+
+				if (uu < p_plus(x)): 
+					n_dk[d][k] =+ 1
+					X_dk[d][k].extend(x)
+					nacceptAdd =+ 1
+				else:
+					B_dk[d][k].append(x)
+
 
 		if (len(B_dk[d][k]) > maxBufferSize):
-			S_d[d].append(B_dk[d][k])
+			S_d[d].extend(B_dk[d][k])
 
 		return(n_dk[d][k])
 
