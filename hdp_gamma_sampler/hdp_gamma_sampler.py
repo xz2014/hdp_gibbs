@@ -9,7 +9,7 @@ import scipy.misc as sm
 
 class hdp_GGPP:
 
-	def _init_(self, alpha, beta, m, V, T, corpus,sizeofstack, maxNIter):
+	def __init__(self, alpha, beta, m, V, T, corpus,sizeofstack, maxNIter, maxBufferSize,numIter):
 		self.alpha = alpha 
 		self.beta = beta   
 		self.V = V   
@@ -17,6 +17,7 @@ class hdp_GGPP:
 		self.T = T   # number of topics
 		self.corpus = corpus
 		self.sizeofstack = sizeofstack # size of each stack for a document. 
+		self.numIter = numIter
 		self.maxNIter = maxNIter # maxNIter: number of iterations to update n_dk in each iteration
 		self.maxBufferSize = maxBufferSize   # if length of B_dk exceeds maxBufferSize, push all the elements from B_dk to S_d
 
@@ -25,26 +26,26 @@ class hdp_GGPP:
 		self.initial_topics = [[0]*len(corpus[0])]*2  # initial topic assignment
 
 ##### All variables:
-		self.S_d = [np.random.choice(corpus[d],sizeofstack,replace=True).tolist() for d in range(D)] # the stack for each document
-		self.B_dk = [[[] for k in topics] for a in corpus] # buffer
-		self.X_dk = [[[] for k in topics] for a in corpus] # each X_dk[d][k] is a list of words
+		self.S_d = [np.random.choice(corpus[d],sizeofstack,replace=True).tolist() for d in range(self.D)] # the stack for each document
+		self.B_dk = [[[] for k in self.topics] for a in corpus] # buffer
+		self.X_dk = [[[] for k in self.topics] for a in corpus] # each X_dk[d][k] is a list of words
 		self.n_dk =[[0]*T for a in corpus] # each n_dk[d][k] is the number of words in document d with topic k
 		self.alpha_k = []*T
-		self.theta_k = [[0.0]*V for a in topics]
-		self.pi_dk = [[np.ndarray(0,dtype=int) for k in topics] for a in corpus]
+		self.theta_k = [[0.0]*V for a in self.topics]
+		self.pi_dk = [[np.ndarray(0,dtype=int) for k in self.topics] for a in corpus]
 
 #### Initialize each variable
 
 	def initial_(self):
-		for d in range(D):
-			for k in range(T):
-				z = [x for x in corpus[d] if initial_topics[d][k] == k ]
-				X_dk[d][k].extend(z)
-				n_dk[d][k] = len(z)
-		pi_dk = [[1]*T for a in corpus]
-		alpha_k = [1]*T
-		theta_k = [[0.5]*V for a in topics]
-		m = 1/T
+		for d in range(self.D):
+			for k in range(self.T):
+				z = [x for x in self.corpus[d] if self.initial_topics[d][k] == k ]
+				self.X_dk[d][k].extend(z)
+				self.n_dk[d][k] = len(z)
+		self.pi_dk = [[1]*self.T for a in self.corpus]
+		self.alpha_k = [1]*self.T
+		self.theta_k = [[0.5]*self.V for a in self.topics]
+		m = 1/self.T
 
 
 
@@ -55,8 +56,8 @@ class hdp_GGPP:
 		new_n_with_topic_k=[]
 		L=[]
 
-		for t in range(1,numIter):
-			for d in range(D):
+		for t in range(1,self.numIter):
+			for d in range(self.D):
 				# update n_dk for each d and k
 				n_dk[d][k] = self.updating_ndk(d, k)
 				
@@ -64,11 +65,11 @@ class hdp_GGPP:
 				pi_dk[d][k] = np.random.gamma(n_dk[d][k]+alpha_k[k], m+1)
 
 			# update alpha_k for each k
-			alpha_k = np.random.gamma(alpha/T+D,-sum(np.log(zip(*pi_dk)[k])))
+			alpha_k = np.random.gamma(self.alpha/self.T+self.D,-sum(np.log(zip(*pi_dk)[k])))
 
 			# update theta_k for each k
-			prob_theta_k = np.exp(sum((beta+self.n_kw[k])*np.log(theta_k[k])))
-			theta_k = np.random.dirichlet(np.add(beta,self.n_kw[k]))
+			prob_theta_k = np.exp(sum((self.beta+self.n_kw[k])*np.log(theta_k[k])))
+			theta_k = np.random.dirichlet(np.add(self.beta,self.n_kw[k]))
 
 			# compute log likelihood
 			l = self.log_likelihood()
@@ -83,7 +84,7 @@ class hdp_GGPP:
 #### for a given d and k, update n_dk using metroplis hasting algorithm. maxNIter iterations
 
 	def updating_ndk(self, d, k):
-		for iter in range(1,maxNIter):
+		for iter in range(1,self.maxNIter):
 			newn =self.sample_ndk(d, k)
 		return(newn)
 
@@ -149,7 +150,7 @@ class hdp_GGPP:
 
  # number of times word w assigned with topic k 
 	def n_kw(self,X_dk):
-		n_kw = [[0]*V for a in topics]
+		n_kw = [[0]*V for a in self.topics]
 		for k in range(T):
 			for w in range(V):
 				c = sum([a for a in zip(*X_dk)[k]],[]).count(w)
