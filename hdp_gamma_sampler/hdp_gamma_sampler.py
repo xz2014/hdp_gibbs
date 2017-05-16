@@ -1,33 +1,39 @@
 #! /usr/bin/env python
 
-#### #######################################  Gibbs sampler in HDP & Gamma-Poisson-Process
+#### #######################################  Gibbs sampler in HDP & Gamma-Gamma-Poisson-Process
 import numpy as np
+import scipy.special as sp
+import scipy.misc as sm
+#from __future__ import division
 
 
 class hdp_GGPP:
 
-	def _init_(self, alpha, beta, m, V, T, corpus,sizeofstack):
-		self.alpha = alpha
-		self.beta = beta
+	def _init_(self, alpha, beta, m, V, T, corpus,sizeofstack, maxNIter):
+		self.alpha = alpha 
+		self.beta = beta   
 		self.V = V   
-		self.m = m
-		self.T = T
+		self.m = m   # n_dk is poisson ~ ( m * pi_dk ) , empirically set as 1/T. 
+		self.T = T   # number of topics
 		self.corpus = corpus
+		self.sizeofstack = sizeofstack # size of each stack for a document. 
+		self.maxNIter = maxNIter # maxNIter: number of iterations to update n_dk in each iteration
+		self.maxBufferSize = maxBufferSize   # if length of B_dk exceeds maxBufferSize, push all the elements from B_dk to S_d
 
 		self.D = len(corpus)
-		self.topics = range(T)
-		self.initial_topics = [[0]*len(corpus[0])]*2
+		self.topics = range(T)  # topics are indexed as 0,1,2...
+		self.initial_topics = [[0]*len(corpus[0])]*2  # initial topic assignment
 
-##### variables:
-		self.S_d = [np.random.choice(corpus[d],sizeofstack,replace=True).tolist() for d in range(D)] # stack for each document
+##### All variables:
+		self.S_d = [np.random.choice(corpus[d],sizeofstack,replace=True).tolist() for d in range(D)] # the stack for each document
 		self.B_dk = [[[] for k in topics] for a in corpus] # buffer
 		self.X_dk = [[[] for k in topics] for a in corpus] # each X_dk[d][k] is a list of words
-		self.n_dk =[np.array([0]*T) for a in corpus] # each n_dk[d][k] is the number of words in document d with topic k
-		self.alpha_k = [[] for a in topics]  
-		self.theta_k = [np.zeros(V,dtype=int) for a in topics]
+		self.n_dk =[[0]*T for a in corpus] # each n_dk[d][k] is the number of words in document d with topic k
+		self.alpha_k = []*T
+		self.theta_k = [[0.0]*V for a in topics]
 		self.pi_dk = [[np.ndarray(0,dtype=int) for k in topics] for a in corpus]
 
-#### initialize each variable
+#### Initialize each variable
 
 	def initial_(self):
 		for d in range(D):
@@ -35,75 +41,55 @@ class hdp_GGPP:
 				z = [x for x in corpus[d] if initial_topics[d][k] == k ]
 				X_dk[d][k].extend(z)
 				n_dk[d][k] = len(z)
-
-#### for a given d and k, update n_dk using metroplis hasting algorithm.
-
-	def updating_ndk(self, d, k, maxNIter):
-		for iter in range(1,maxNIter):
-			newn =sample_ndk(d,k, maxBufferSize)
-		return(newn)
-
-##### 
-
-	def inference(self,numIter):
-		for k in range(self.T):
-			for t in range(self.numIter):
-				self.parallel_for_each_topic(k)
-
-			alpha_k = np.random.gamma(self.alpha/T+self.D,-sum(np.log(self.pi_dk)))
+		pi_dk = [[1]*T for a in corpus]
+		alpha_k = [1]*T
+		theta_k = [[0.5]*V for a in topics]
+		m = 1/T
 
 
 
+######### for a given k, run gibbs sampling 
 
+	def parallel_samplging_for_each_topic(self,k): 
+		self.initial_()
+		new_n_with_topic_k=[]
+		L=[]
 
-	def parallel_for_each_topic(self,k,maxNIter,maxBufferSize): # maxNIter: number of iterations to update n_dk in each iteration
-		n_new=[]
-		for d in range(D):
-			for niter in range(maxNIter):
-				n_dk.append(sample_ndk(self,d,k,maxBufferSize))
+		for t in range(1,numIter):
+			for d in range(D):
+				# update n_dk for each d and k
+				n_dk[d][k] = self.updating_ndk(d, k)
+				
+				# update pi_dk for each d and k
+				pi_dk[d][k] = np.random.gamma(n_dk[d][k]+alpha_k[k], m+1)
 
-		# update pi_dk for each d and k
-		pi_dk = np.random.gamma(n_new[d][k]+alpha_k[k], m+1)	
+			# update alpha_k for each k
+			alpha_k = np.random.gamma(alpha/T+D,-sum(np.log(zip(*pi_dk)[k])))
 
-		print("Topic k:")
+			# update theta_k for each k
+			prob_theta_k = np.exp(sum((beta+self.n_kw[k])*np.log(theta_k[k])))
+			theta_k = np.random.dirichlet(np.add(beta,self.n_kw[k]))
 
-		return(n_dk,pi_dk)
+			# compute log likelihood
+			l = self.log_likelihood()
+			L.append(l)
+			print "The Log-likelihood at iteration {}. is {}. Topic{}'.format(t,l,k)"
 
-
-
-
-
-
-
-	x_ji=corpus
-
-	t_ji=[np.zeros(len(a),dtype=int) for a in corpus] # table index
-	k_jt=[[] for a in corpus]   # dish index
-	n_jt = [np.ndarray(0,dtype=int) for a in corpus]  # number of words at table t in restaruant j
-
-	tables=[[] for a in corpus] # table id
-	dishes=[] # dish id
-
-	m_k = np.ndarray(0,dtype=int)  # number of tables for each dish
-	n_k = np.ndarray(0,dtype=int)  # number of customers for each dish
-	n_kv = np.ndarray((0, V),dtype=int)  # number of word v for each dish 
-
+		return(L)
 
 
 	
-# acceptance rate 
-	def p_minus(self,w):
-		return(n_dk[d][k]/((m*pi_dk[d][k])*theta_k[k][w]))
-		
 
-	def p_plus(self,w):
-		return((m*pi_dk[d][k])/(n_dk[d][k]+1)*theta_k[k][w])
+#### for a given d and k, update n_dk using metroplis hasting algorithm. maxNIter iterations
+
+	def updating_ndk(self, d, k):
+		for iter in range(1,maxNIter):
+			newn =self.sample_ndk(d, k)
+		return(newn)
 
 
-####### sample n_dk
-	def sample_ndk(self, d,k, maxBufferSize):
-		nacceptAdd = 0
-		nacceptMinus = 0
+####### sample n_dk, one iteration
+	def sample_ndk(self, d,k):
 		u = np.random.uniform(0,1)
 
 		if u<0.5:
@@ -113,9 +99,8 @@ class hdp_GGPP:
 			uu = np.random.uniform(0,1)
 
 			if (uu < p_plus(x)): # accept with prob = min(1,p_plus)
-				n_dk[d][k] =+ 1
-				X_dk[d][k].extend(x)
-				nacceptAdd =+ 1
+				n_dk[d][k] += 1
+				X_dk[d][k].append(x)
 			else:
 				B_dk[d][k].append(x)
 
@@ -125,8 +110,7 @@ class hdp_GGPP:
 				X_dk[d][k].remove(x)
 				uu = np.random.uniform(0,1)
 				if (uu < p_minus(x)):  
-					n_dk[d][k] =- 1
-					nacceptMinus =+ 1
+					n_dk[d][k] -= 1
 					B_dk[d][k].append(x)
 				else:
 					X_dk[d][k].append(x)
@@ -136,10 +120,41 @@ class hdp_GGPP:
 
 		return(n_dk[d][k])
 
+
+
+
+# acceptance rate 
+	def p_minus(self,w):
+		return(n_dk[d][k]/((m*pi_dk[d][k])*theta_k[k][w]))
+		
+
+	def p_plus(self,w):
+		return((m*pi_dk[d][k])*theta_k[k][w]/(n_dk[d][k]+1))
+
+
+
+
 # complete loglikelihood log P(n_dk, pi_dk, alpha_k, theta_k, X_dk)
-	def log_likelihood(self): 
+	def log_likelihood(self):
+		LL=[]
 		for k in range(T):
-			l1 = np.log(m)*n_dk[:][k]-sp.gammaln(alpha_k[k])+(n_dk[:][k]+alpha_k[k]-1)*np.log(pi_dk[:][k])-(m+1)*pi_dk[:][k]-np.log(factorial(n_dk[:][k]))
+			v = np.array(zip(*n_dk)[k])
+			q = np.array(zip(*pi_dk)[k])
+			e = np.array(zip(*X_dk)[k])
+			l1 = sum(np.log(m)*v-sp.gammaln(alpha_k[k])+(v+alpha_k[k]-1)*np.log(q)-(m+1)*q-np.log(sm.factorial(v)))
+			l2 = (-1+alpha/T)*np.log(alpha_k[k]) - alpha_k[k] +sum(beta*np.log(theta_k[k]))
+			l3 = sum(self.n_kw(X_dk)[k]*np.log(theta_k[k]))
+			LL.append(l1+l2+l3)
+		return(sum(LL))
+
+ # number of times word w assigned with topic k 
+	def n_kw(self,X_dk):
+		n_kw = [[0]*V for a in topics]
+		for k in range(T):
+			for w in range(V):
+				c = sum([a for a in zip(*X_dk)[k]],[]).count(w)
+				n_kw[k][w] = c
+		return(n_kw)
 
 
 	def dump(self, disp_x=False):
@@ -148,16 +163,8 @@ class hdp_GGPP:
 		print "pi_dk:",self.pi_dk
 		print "alpha_k:",self.alpha_k
 		print "theta_k:", self.theta_k
-
-
-	def log_factorial(self,n_dk): # log (n_dk!)
-		j=0
-		for i in range(n_dk):
-			j=np.log(i)+j
-		return(j)
-
  
-
+			
 
 
 
